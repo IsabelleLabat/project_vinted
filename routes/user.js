@@ -2,12 +2,15 @@ const express = require("express");
 const uid2 = require("uid2"); //package qui sert à crér des string aléatoires
 const SHA256 = require("crypto-js/sha256"); // sert à encrypter une string
 const encBase64 = require("crypto-js/enc-base64"); // sert à tranformer l'encryptage en string
+const convertToBase64 = require("../utils/convertToBase64");
+const fileUpload = require("express-fileupload");
+const cloudinary = require("cloudinary").v2;
 
 const router = express.Router();
 
 const User = require("../models/User");
 
-router.post("/user/signup", async (req, res) => {
+router.post("/user/signup", fileUpload(), async (req, res) => {
   try {
     // si l'email existe déjà
     const emailFound = await User.findOne({ email: req.body.email });
@@ -28,13 +31,21 @@ router.post("/user/signup", async (req, res) => {
     // on génère un token
     // console.log("token   ", token);
 
+    const pictureToUpload = req.files.picture;
+    // On envoie une à Cloudinary un buffer converti en base64
+    const result = await cloudinary.uploader.upload(
+      convertToBase64(pictureToUpload)
+    );
+    //return res.json(result);
+    console.log(result);
     // const {username, email, password, newsletter} = req.body;
     const newUser = new User({
       unsername: req.body.username,
       email: req.body.email,
       password: req.body.password,
       newsletter: req.body.newsletter,
-      account: { username: req.body.username },
+      account: { username: req.body.username, avatar: result },
+
       token: token,
       hash: hash,
       salt: salt,
@@ -51,6 +62,7 @@ router.post("/user/signup", async (req, res) => {
       },
     });
   } catch (error) {
+    console.log(error.message);
     res.status(500).json({ message: error.message });
   }
 });

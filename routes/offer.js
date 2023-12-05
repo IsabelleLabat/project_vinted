@@ -4,9 +4,10 @@ const fileUpload = require("express-fileupload");
 const cloudinary = require("cloudinary").v2;
 const Offer = require("../models/Offer");
 const isAuthenticated = require("../middlewares/isAuthenticated");
+const convertToBase64 = require("../utils/convertToBase64");
 
 router.post(
-  "/offers/publish",
+  "/offer/publish",
   fileUpload(),
   isAuthenticated,
   async (req, res) => {
@@ -87,29 +88,89 @@ router.get("/offers", async (req, res) => {
     const skip = (pageToSend - 1) * 5;
 
     const offers = await Offer.find(filter)
+      .populate("owner")
       .sort(sortFilter)
       .limit(5)
-      .skip(skip)
-      .select("product_price product_name");
+      .skip(skip);
+    // .select("product_price product_name");
 
-    res.status(201).json(offers);
+    res.status(201).json({ offers: offers });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 });
 
-router.put("/offer/update", async (req, res) => {
-  try {
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-});
+// MODIFY AN OFFER
+router.put(
+  "/offer/update/:id",
+  fileUpload(),
+  isAuthenticated,
+  async (req, res) => {
+    try {
+      // On va chercher l'offre correspondant à l'id
+      const ModifyOffer = await Offer.findById(req.params.id);
+      // si on reçoit un title dans le body
+      if (req.body.title) {
+        // on remplace le product_name
+        ModifyOffer.product_name = req.body.title;
+      }
+      if (req.body.description) {
+        ModifyOffer.product_description = req.body.description;
+      }
+      if (req.body.price) {
+        ModifyOffer.product_price = req.body.price;
+      }
+      if (req.body.condition) {
+        ModifyOffer.product_condition = req.body.product_condition;
+      }
 
-router.delete("/offers/:id", async (req, res) => {
+      const details = ModifyOffer.product_details;
+
+      // On parcourt le tableau product_details de l'offre à modifier
+      for (let i = 0; i < details.length; i++) {
+        console.log(details[i]);
+        // Pour chaque objet, si on a reçu un détail à modifier on met à jour la clé de l'objet
+        if (details[i].MARQUE) {
+          if (req.body.brand) {
+            details[i].MARQUE = req.body.brand;
+          }
+        }
+        if (details[i].TAILLE) {
+          if (req.body.size) {
+            details[i].TAILLE = req.body.size;
+          }
+        }
+        if (details[i].ÉTAT) {
+          if (req.body.condition) {
+            details[i].ÉTAT = req.body.condition;
+          }
+        }
+        if (details[i].COULEUR) {
+          if (req.body.color) {
+            details[i].COULEUR = req.body.color;
+          }
+        }
+        if (details[i].EMPLACEMENT) {
+          if (req.body.location) {
+            details[i].EMPLACEMENT = req.body.location;
+          }
+        }
+      }
+
+      await ModifyOffer.save();
+      res.status(201).json(ModifyOffer);
+    } catch (error) {
+      res.status(500).json({ message: error.message });
+    }
+  }
+);
+
+// DELETE AN OFFER
+router.delete("/offer/:id", fileUpload(), isAuthenticated, async (req, res) => {
   try {
     // si l'id a bien été transmis
     if (req.params.id) {
-      // On recherche l'offre à modifier à partir de son id et on la supprime :
+      // On recherche l'offre à supprimer à partir de son id et on la supprime :
       await Offer.findByIdAndDelete(req.params.id);
 
       // on répond au client
@@ -123,7 +184,7 @@ router.delete("/offers/:id", async (req, res) => {
   }
 });
 
-router.get("/offers/:id", async (req, res) => {
+router.get("/offer/:id", async (req, res) => {
   try {
     const offerbyId = await Offer.findById(req.params.id).populate(
       "owner",
